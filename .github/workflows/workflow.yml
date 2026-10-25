@@ -37,6 +37,13 @@ jobs:
           - ocaml-version: 5.2.0
             required: false
             os: ubuntu-latest
+          # C23 is the default in GCC >= 15: build in that mode explicitly,
+          # whatever the GCC version of the runner ("4.14" and not 4.14.1
+          # so this is a new job and not merged into the existing one)
+          - ocaml-version: "4.14"
+            required: true
+            os: ubuntu-latest
+            cflags: -O2 -std=gnu23
 
     runs-on: ${{ matrix.os }}
 
@@ -89,14 +96,53 @@ jobs:
       # SHELLOPTS workaround for windows
       # setting SHELLOPTS via GITHUB_ENV didn't work for some reason
       - run: opam exec -- env SHELLOPTS=igncr sh ./configure --enable-debug --enable-upnp-natpmp
+        if: ${{ ! matrix.cflags }}
+
+      # CFLAGS only where set: an empty CFLAGS would drop configure's defaults
+      - run: opam exec -- sh ./configure --enable-debug --enable-upnp-natpmp CFLAGS="${{ matrix.cflags }}"
+        if: ${{ matrix.cflags }}
 
       - run: opam exec -- make
 
       - run: opam exec -- make utils
 
       - name: Upload the build artifact
-        if: ${{ matrix.ocaml-version == '4.14.1' }}
+        if: ${{ matrix.ocaml-version == '4.14.1' && ! matrix.cflags }}
         uses: actions/upload-artifact@v4
         with:
           name: mlnet-${{ matrix.os }}.exe
           path: mlnet
+
+  # Build on Gentoo with its current toolchain (GCC 15, C23 by default) and
+  # without any workaround flags, as a distribution user would.
+  gentoo:
+    runs-on: ubuntu-latest
+    container: gentoo/stage3:latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Sync the Gentoo repository
+        run: emerge-webrsync --quiet
+
+      # OCaml 5 is not supported yet (Genlex, -unsafe-string): stay on 4.x
+      - name: Install build dependencies
+        run: |
+          mkdir -p /etc/portage/package.mask
+          echo '>=dev-lang/ocaml-5' > /etc/portage/package.mask/ocaml
+          emerge --quiet-build --getbinpkg --noreplace --jobs=4 \
+            dev-lang/ocaml dev-ml/camlp4 dev-ml/findlib dev-ml/num \
+            dev-libs/crypto++ net-libs/miniupnpc net-libs/libnatpmp
+
+      - name: show build environment
+        run: |
+          gcc --version
+          ocamlfind ocamlopt -version
+        continue-on-error: true
+
+      - run: ./configure --enable-debug --enable-upnp-natpmp
+
+      - run: make
+
+      - run: make utils
