@@ -49,14 +49,21 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Use OCaml ${{ matrix.ocaml-version }}
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-version }}
+          # compilers < 4.11 were moved out of the main opam repository
+          opam-repositories: |
+            default: https://github.com/ocaml/opam-repository.git
+            archive: https://github.com/ocaml/opam-repository-archive.git
 
-      - run: sudo apt install libcrypto++-dev libminiupnpc-dev libnatpmp-dev libgd-dev
+      # refresh the package index first: a stale one gives 404s
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libcrypto++-dev libminiupnpc-dev libnatpmp-dev libgd-dev
         if: matrix.os == 'ubuntu-latest'
 
       - run: brew install cryptopp miniupnpc libnatpmp gd
@@ -69,7 +76,9 @@ jobs:
 
       # https://cygwin.com/packages/ doesn't have cryptopp and many other packages
       # I guess should build with mingw?
-      - run: D:\\cygwin\\setup-x86_64.exe "--root" "D:\\cygwin" "--quiet-mode" "unattended" "--no-shortcuts" "--no-startmenu" "--no-desktop" "--no-admin" "--no-version-check" "--no-write-registry" "--packages" "mingw64-x86_64-gd"
+      # setup-ocaml v3 lets opam install its own Cygwin under $OPAMROOT\.cygwin
+      - run: |
+          & "$env:OPAMROOT\.cygwin\setup-x86_64.exe" "--root" "$env:OPAMROOT\.cygwin\root" "--quiet-mode" "unattended" "--no-shortcuts" "--no-startmenu" "--no-desktop" "--no-admin" "--no-version-check" "--no-write-registry" "--packages" "mingw64-x86_64-gd"
         if: matrix.os == 'windows-latest'
 
       - run: |
@@ -121,7 +130,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Sync the Gentoo repository
         run: emerge-webrsync --quiet
