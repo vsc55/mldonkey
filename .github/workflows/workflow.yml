@@ -25,8 +25,10 @@ jobs:
           - 4.14.1
         required:
           - true
+        # not 26.04: its GCC defaults to C23, which the older OCaml
+        # compilers built by setup-ocaml don't compile with
         os:
-          - ubuntu-26.04
+          - ubuntu-24.04
         include:
           - ocaml-version: 4.14.1
             required: true
@@ -36,14 +38,14 @@ jobs:
             os: windows-latest
           - ocaml-version: 5.2.0
             required: false
-            os: ubuntu-26.04
+            os: ubuntu-24.04
           # C23 is the default in GCC >= 15: build in that mode explicitly,
           # whatever the GCC version of the runner ("4.14" and not 4.14.1
           # so this is a new job and not merged into the existing one).
           # gnu2x and not gnu23: GCC < 14 only knows the former name
           - ocaml-version: "4.14"
             required: true
-            os: ubuntu-26.04
+            os: ubuntu-24.04
             cflags: -O2 -std=gnu2x
 
     runs-on: ${{ matrix.os }}
@@ -65,7 +67,7 @@ jobs:
       - run: |
           sudo apt-get update
           sudo apt-get install -y libcrypto++-dev libminiupnpc-dev libnatpmp-dev libgd-dev
-        if: matrix.os == 'ubuntu-26.04'
+        if: matrix.os == 'ubuntu-24.04'
 
       - run: brew install cryptopp miniupnpc libnatpmp gd
         if: matrix.os == 'macos-latest'
@@ -126,7 +128,7 @@ jobs:
   # Build on Gentoo with its current toolchain (GCC 15, C23 by default) and
   # without any workaround flags, as a distribution user would.
   gentoo:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
     container: gentoo/stage3:latest
 
     steps:
